@@ -7,21 +7,15 @@ const MELT_EXECUTABLE: &str = r"C:\Program Files\ShotCut\melt.exe";
 fn concat_mkv(input_folder: &str, output_file: &str) {
     let mut files: Vec<_> = fs::read_dir(input_folder)
         .expect("Could not read directory")
-        .filter_map(|entry| {
-            let entry = entry.expect("Could not read directory entry");
-            let path = entry.path();
-            if path.extension().and_then(|s| s.to_str()) == Some("mkv") {
-                Some((
-                    path,
-                    entry
-                        .metadata()
-                        .unwrap()
-                        .modified()
-                        .unwrap_or(SystemTime::now()),
-                ))
-            } else {
-                None
-            }
+        .map(|entry| entry.expect("Could not read directory entry"))
+        .filter(|entry| entry.path().extension().and_then(|s| s.to_str()) == Some("mkv"))
+        .map(|entry| {
+            let modified_time = entry
+                .metadata()
+                .unwrap()
+                .modified()
+                .unwrap_or(SystemTime::now());
+            (entry.path(), modified_time)
         })
         .collect();
 
