@@ -4,7 +4,7 @@ use std::time::SystemTime;
 
 const MELT_EXECUTABLE: &str = r"C:\Program Files\ShotCut\melt.exe";
 
-fn concat_mkv(input_folder: &str, output_file: &str) {
+fn concat_mkv(input_folder: &str) {
     let mut files: Vec<_> = fs::read_dir(input_folder)
         .expect("Could not read directory")
         .map(|entry| entry.expect("Could not read directory entry"))
@@ -27,13 +27,17 @@ fn concat_mkv(input_folder: &str, output_file: &str) {
         .collect();
 
     let mut melt_command = Command::new(MELT_EXECUTABLE);
+    melt_command.current_dir(input_folder);
+
     for file in &sorted_files {
         melt_command.arg(file);
     }
 
     melt_command
+        .arg("-verbose")
+        .arg("-progress 2")
         .arg("-consumer")
-        .arg(format!("avformat:{}\\{}", input_folder, output_file))
+        .arg(format!("xml:{}\\pass1.mlt", input_folder))
         .arg("acodec=aac")
         .arg("vcodec=libx264");
 
@@ -50,11 +54,13 @@ fn concat_mkv(input_folder: &str, output_file: &str) {
 
     match melt_command.status() {
         Ok(status) if status.success() => {
-            println!("Successfully merged files into {}", output_file)
+            println!("Successfully merged!")
         }
         Ok(status) => eprintln!("melt.exe failed with exit code: {}", status),
         Err(err) => eprintln!("Failed to execute melt.exe: {}", err),
     }
+
+    // TODO: we need to add "<playlist/>"
 }
 
 fn main() {
@@ -62,7 +68,7 @@ fn main() {
 
     if args.len() == 3 && args[1] == "concat" {
         let input_folder = &args[2];
-        concat_mkv(input_folder, "output.mkv");
+        concat_mkv(input_folder);
     } else {
         eprintln!("Usage: cut-bot concat <input_folder>");
     }
