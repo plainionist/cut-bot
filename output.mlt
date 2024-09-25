@@ -1,0 +1,38 @@
+<mlt>
+  <profile description="HD 1080p 25 fps" width="1920" height="1080" progressive="1" sample_aspect_num="1" sample_aspect_den="1" display_aspect_num="16" display_aspect_den="9" frame_rate_num="25" frame_rate_den="1" colorspace="709"/>
+  <playlist id="playlist0">
+    <entry producer="producer1" in="0" out="0.00"/>
+    <entry producer="producer1" in="4.00" out="4.17"/>
+    <entry producer="producer1" in="8.17" out="8.33"/>
+    <entry producer="producer1" in="12.33" out="12.50"/>
+    <entry producer="producer1" in="16.50" out="16.67"/>
+    <entry producer="producer1" in="20.67" out="20.83"/>
+    <entry producer="producer1" in="24.83" out="25.00"/>
+    <entry producer="producer1" in="29.00" out="29.17"/>
+    <entry producer="producer1" in="33.17" out="33.33"/>
+    <entry producer="producer1" in="37.33" out="37.50"/>
+    <entry producer="producer1" in="41.50" out="41.67"/>
+    <entry producer="producer1" in="45.67" out="45.83"/>
+    <entry producer="producer1" in="49.83" out="50.00"/>
+    <entry producer="producer1" in="54.00" out="54.17"/>
+    <entry producer="producer1" in="58.17" out="58.33"/>
+    <entry producer="producer1" in="62.33" out="62.50"/>
+    <entry producer="producer1" in="66.50" out="66.67"/>
+    <entry producer="producer1" in="70.67" out="70.83"/>
+    <entry producer="producer1" in="74.83" out="75.00"/>
+    <entry producer="producer1" in="79.00" out="79.17"/>
+    <entry producer="producer1" in="83.17" out="83.33"/>
+    <entry producer="producer1" in="87.33" out="87.50"/>
+    <entry producer="producer1" in="91.50" out="91.67"/>
+    <entry producer="producer1" in="95.67" out="95.83"/>
+    <entry producer="producer1" in="99.83" out="100.00"/>
+    <entry producer="producer1" in="104.00" out="104.17"/>
+    <entry producer="producer1" in="108.17" out="108.33"/>
+    <entry producer="producer1" in="112.33" out="112.50"/>
+    <entry producer="producer1" in="116.50" out="116.67"/>
+    <entry producer="producer1" in="120.68" out="end"/>
+  </playlist>
+  <producer id="producer1">
+    <property name="resource">C:\Users\ssmosett\Videos\pass1.mp4</property>
+  </producer>
+</mlt>
