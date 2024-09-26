@@ -102,16 +102,13 @@ fn generate_mlt(timestamps: &[SilenceEvent], input_file: &str, output_file: &str
 
   // Add tractor element with background and playlist tracks
   mlt_content.push_str(
-      r#"  <tractor id="tractor0" title="Shotcut version 24.08.29" in="00:00:00.000" out="00:02:00.667">
+      r#"  <tractor id="tractor0" in="00:00:00.000" out="00:02:00.667">
   <property name="shotcut">1</property>
   <property name="shotcut:projectAudioChannels">2</property>
   <property name="shotcut:projectFolder">0</property>
+  <property name="shotcut:skipConvert">0</property>
   <track producer="background"/>
   <track producer="playlist0"/>
-  <transition id="transition0">
-  </transition>
-  <transition id="transition1">
-  </transition>
 </tractor>
 </mlt>
 "#,
