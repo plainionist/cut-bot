@@ -55,48 +55,78 @@ fn parse_ffmpeg_output(output: &str) -> Vec<SilenceEvent> {
 }
 
 fn generate_mlt(timestamps: &[SilenceEvent], input_file: &str, output_file: &str) {
-    let mut mlt_content = String::from(
-        r#"<mlt>
-  <profile description="HD 1080p 25 fps" width="1920" height="1080" progressive="1" sample_aspect_num="1" sample_aspect_den="1" display_aspect_num="16" display_aspect_den="9" frame_rate_num="25" frame_rate_den="1" colorspace="709"/>
-  <playlist id="playlist0">
+  let mut mlt_content = String::from(
+      r#"<?xml version="1.0" standalone="no"?>
+<mlt LC_NUMERIC="C" version="7.27.0" producer="main_bin">
+<profile width="2560" height="1440" progressive="1" sample_aspect_num="1" sample_aspect_den="1" display_aspect_num="16" display_aspect_den="9" frame_rate_num="60000000" frame_rate_den="1000000" colorspace="709"/>
+<playlist id="main_bin">
+</playlist>
+<producer id="black" in="00:00:00.000" out="00:02:00.667">
+</producer>
+<playlist id="background">
+  <entry producer="black" in="00:00:00.000" out="00:02:00.667"/>
+</playlist>
 "#,
-    );
+  );
 
-    for (i, event) in timestamps.iter().enumerate() {
-        if i == 0 {
-            mlt_content.push_str(&format!(
-                r#"    <entry producer="producer1" in="0" out="{:.2}"/>"#,
-                event.start
-            ));
-        } else {
-            let prev_end = timestamps[i - 1].end;
-            mlt_content.push_str(&format!(
-                r#"    <entry producer="producer1" in="{:.2}" out="{:.2}"/>"#,
-                prev_end, event.start
-            ));
-        }
-    }
+  // Add chain elements and corresponding playlist entries
+  for (i, event) in timestamps.iter().enumerate() {
+      // Create a chain for each segment
+      mlt_content.push_str(&format!(
+          r#"  <chain id="chain{}" out="{:.3}">
+  <property name="resource">{}</property>
+</chain>
+"#,
+          i, event.end, input_file
+      ));
+  }
 
-    if let Some(last) = timestamps.last() {
-        mlt_content.push_str(&format!(
-            r#"    <entry producer="producer1" in="{:.2}" out="end"/>"#,
-            last.end
-        ));
-    }
+  // Start the playlist definition
+  mlt_content.push_str(r#"  <playlist id="playlist0">
+"#);
 
-    mlt_content.push_str(&format!(
-        r#"  </playlist>
-  <producer id="producer1">
-    <property name="resource">{}</property>
-  </producer>
+  // Add entries to the playlist, linking each chain
+  for (i, event) in timestamps.iter().enumerate() {
+      let start_time = format_time(event.start);
+      let end_time = format_time(event.end);
+      mlt_content.push_str(&format!(
+          r#"    <entry producer="chain{}" in="{}" out="{}"/>
+"#,
+          i, start_time, end_time
+      ));
+  }
+
+  // Close the playlist
+  mlt_content.push_str(r#"  </playlist>
+"#);
+
+  // Add tractor element with background and playlist tracks
+  mlt_content.push_str(
+      r#"  <tractor id="tractor0" title="Shotcut version 24.08.29" in="00:00:00.000" out="00:02:00.667">
+  <property name="shotcut">1</property>
+  <property name="shotcut:projectAudioChannels">2</property>
+  <property name="shotcut:projectFolder">0</property>
+  <track producer="background"/>
+  <track producer="playlist0"/>
+  <transition id="transition0">
+  </transition>
+  <transition id="transition1">
+  </transition>
+</tractor>
 </mlt>
 "#,
-        input_file
-    ));
+  );
 
-    let mut file = File::create(output_file).expect("Unable to create file");
-    file.write_all(mlt_content.as_bytes())
-        .expect("Unable to write data");
+  let mut file = File::create(output_file).expect("Unable to create file");
+  file.write_all(mlt_content.as_bytes())
+      .expect("Unable to write data");
+}
+
+fn format_time(seconds: f64) -> String {
+  let hours = (seconds / 3600.0).floor() as u32;
+  let minutes = ((seconds % 3600.0) / 60.0).floor() as u32;
+  let seconds = seconds % 60.0;
+  format!("{:02}:{:02}:{:06.3}", hours, minutes, seconds)
 }
 
 fn generate_output_mlt_path(input_path: &Path) -> PathBuf {
