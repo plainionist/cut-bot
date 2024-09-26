@@ -64,15 +64,13 @@ fn generate_mlt(timestamps: &[SilenceEvent], input_file: &str, output_file: &str
     for (i, event) in timestamps.iter().enumerate() {
         if i == 0 {
             mlt_content.push_str(&format!(
-                r#"    <entry producer="producer1" in="0" out="{:.2}"/>
-"#,
+                r#"    <entry producer="producer1" in="0" out="{:.2}"/>"#,
                 event.start
             ));
         } else {
             let prev_end = timestamps[i - 1].end;
             mlt_content.push_str(&format!(
-                r#"    <entry producer="producer1" in="{:.2}" out="{:.2}"/>
-"#,
+                r#"    <entry producer="producer1" in="{:.2}" out="{:.2}"/>"#,
                 prev_end, event.start
             ));
         }
@@ -80,8 +78,7 @@ fn generate_mlt(timestamps: &[SilenceEvent], input_file: &str, output_file: &str
 
     if let Some(last) = timestamps.last() {
         mlt_content.push_str(&format!(
-            r#"    <entry producer="producer1" in="{:.2}" out="end"/>
-"#,
+            r#"    <entry producer="producer1" in="{:.2}" out="end"/>"#,
             last.end
         ));
     }
