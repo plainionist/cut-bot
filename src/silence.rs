@@ -70,14 +70,14 @@ fn generate_mlt(timestamps: &[SilenceEvent], input_file: &str, output_file: &str
   );
 
   // Add chain elements and corresponding playlist entries
-  for (i, event) in timestamps.iter().enumerate() {
+  for (i, _) in timestamps.iter().enumerate() {
       // Create a chain for each segment
       mlt_content.push_str(&format!(
-          r#"  <chain id="chain{}" out="{:.3}">
+          r#"  <chain id="chain{}" out="00:02:00.667">
   <property name="resource">{}</property>
 </chain>
 "#,
-          i, event.end, input_file
+          i, input_file
       ));
   }
 
