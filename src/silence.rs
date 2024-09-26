@@ -31,7 +31,7 @@ fn run_ffmpeg(input_file: &str) -> Vec<SilenceEvent> {
       .arg("-i")
       .arg(input_file)
       .arg("-af")
-      .arg("silencedetect=noise=-30dB:d=0.5")
+      .arg("silencedetect=noise=-30dB:d=0.25")
       .arg("-f")
       .arg("null")
       .arg("-")
