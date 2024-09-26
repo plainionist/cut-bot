@@ -1,7 +1,8 @@
-use std::process::{Command, Stdio};
 use regex::Regex;
 use std::fs::File;
 use std::io::Write;
+use std::process::{Command, Stdio};
+use std::path::{Path, PathBuf};
 
 #[derive(Debug)]
 struct SilenceEvent {
@@ -98,15 +99,20 @@ fn generate_mlt(timestamps: &[SilenceEvent], input_file: &str, output_file: &str
         .expect("Unable to write data");
 }
 
-pub fn silence(input_video:&str) {
-    let output_mlt = "output.mlt";
+fn generate_output_mlt_path(input_path: &Path) -> PathBuf {
+  let parent_dir = input_path.parent().unwrap_or_else(|| Path::new("."));
+  let output_mlt = parent_dir.join("output.mlt"); 
+  output_mlt
+}
 
-    // Run FFmpeg to detect silence and parse the output
+pub fn silence(input_video: &str) {
+    let input_path = Path::new(input_video);
+    let output_mlt = generate_output_mlt_path(input_path);
+
     let silence_events = run_ffmpeg(input_video);
     println!("Parsed silence events: {:?}", silence_events);
 
-    // Generate MLT file based on the parsed silence events
-    generate_mlt(&silence_events, input_video, output_mlt);
+    generate_mlt(&silence_events, input_video, &output_mlt.to_string_lossy());
 
-    println!("MLT file generated: {}", output_mlt);
+    println!("MLT file generated: {}", output_mlt.to_string_lossy());
 }
