@@ -4,15 +4,9 @@ use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 
-#[derive(Debug)]
-struct SilenceEvent {
-    start: f64,
-    end: f64,
-}
-
 const FFMPEG_EXECUTABLE: &str = r"C:\Program Files\ShotCut\ffmpeg.exe";
 
-fn run_ffmpeg(input_file: &str) -> (Vec<SilenceEvent>, f64) {
+fn run_ffmpeg(input_file: &str) -> (Vec<f64>, Vec<f64>, f64) {
     let duration_output = Command::new(FFMPEG_EXECUTABLE)
         .arg("-i")
         .arg(input_file)
@@ -25,22 +19,94 @@ fn run_ffmpeg(input_file: &str) -> (Vec<SilenceEvent>, f64) {
 
     let duration = parse_duration(&String::from_utf8_lossy(&duration_output.stderr));
 
-    let ffmpeg_output = Command::new(FFMPEG_EXECUTABLE)
+    let loud_ffmpeg_output = Command::new(FFMPEG_EXECUTABLE)
         .arg("-i")
         .arg(input_file)
         .arg("-af")
-        .arg("silencedetect=noise=-40dB:d=0.9")
+        .arg("silencedetect=noise=-30dB:d=1")
         .arg("-f")
         .arg("null")
         .arg("-")
-        .stderr(Stdio::piped()) // FFmpeg writes to stderr, so we capture that
+        .stderr(Stdio::piped())
         .output()
-        .expect("Failed to execute FFmpeg");
+        .expect("Failed to execute FFmpeg for loud detection");
 
-    let output = String::from_utf8_lossy(&ffmpeg_output.stderr);
-    let silence_events = parse_ffmpeg_output(&output, duration);
+    let loud_periods =
+        parse_ffmpeg_output_for_loud(&String::from_utf8_lossy(&loud_ffmpeg_output.stderr));
 
-    (silence_events, duration)
+    let silence_ffmpeg_output = Command::new(FFMPEG_EXECUTABLE)
+        .arg("-i")
+        .arg(input_file)
+        .arg("-af")
+        .arg("silencedetect=noise=-60dB:d=0.1")
+        .arg("-f")
+        .arg("null")
+        .arg("-")
+        .stderr(Stdio::piped())
+        .output()
+        .expect("Failed to execute FFmpeg for silence detection");
+
+    let silent_periods =
+        parse_ffmpeg_output_for_silence(&String::from_utf8_lossy(&silence_ffmpeg_output.stderr));
+
+    (loud_periods, silent_periods, duration)
+}
+
+fn parse_ffmpeg_output_for_loud(output: &str) -> Vec<f64> {
+    let mut loud_periods = Vec::new();
+    let silence_end_re = Regex::new(r"silence_end:\s*(\d+\.?\d*)").unwrap();
+
+    for line in output.lines() {
+        if let Some(end_cap) = silence_end_re.captures(line) {
+            let silence_end = end_cap[1].parse::<f64>().unwrap();
+            loud_periods.push(silence_end); // Non-silent period starts after silence ends
+        }
+    }
+
+    loud_periods
+}
+
+fn parse_ffmpeg_output_for_silence(output: &str) -> Vec<f64> {
+    let mut silent_periods = Vec::new();
+    let silence_start_re = Regex::new(r"silence_start:\s*(\d+\.?\d*)").unwrap();
+
+    for line in output.lines() {
+        if let Some(start_cap) = silence_start_re.captures(line) {
+            let silence_start = start_cap[1].parse::<f64>().unwrap();
+            silent_periods.push(silence_start); // Silence starts here
+        }
+    }
+
+    silent_periods
+}
+
+fn find_audio_chunks(loud_periods: &[f64], silent_periods: &[f64], total_duration: f64) -> Vec<(f64, f64)> {
+    let mut all_chunks = Vec::new();
+    let mut current_time = 0.0;
+
+    for &start in loud_periods {
+        // Add silent period before the loud period if necessary
+        if current_time < start {
+            all_chunks.push((current_time, start)); // Silent chunk before loud period
+        }
+
+        // Find the next silent period after the loud start
+        let end = silent_periods
+            .iter()
+            .find(|&&silence_start| silence_start > start)
+            .cloned()
+            .unwrap_or(total_duration); // If no silence is found, go until the end
+
+        all_chunks.push((start, end)); // Loud chunk
+        current_time = end; // Move to the end of this loud chunk
+    }
+
+    // Add any remaining silent chunk if necessary
+    if current_time < total_duration {
+        all_chunks.push((current_time, total_duration)); // Remaining silence
+    }
+
+    all_chunks
 }
 
 fn parse_duration(output: &str) -> f64 {
@@ -55,74 +121,7 @@ fn parse_duration(output: &str) -> f64 {
     0.0
 }
 
-fn parse_ffmpeg_output(output: &str, total_duration: f64) -> Vec<SilenceEvent> {
-    let mut silence_events = Vec::new();
-
-    let silence_start_re = Regex::new(r"silence_start:\s*(\d+\.?\d*)").unwrap();
-    let silence_end_re = Regex::new(r"silence_end:\s*(\d+\.?\d*)").unwrap();
-
-    let mut current_position = 0.0;
-    let mut last_silence_end: Option<f64> = None;
-
-    for line in output.lines() {
-        // Detect silence start
-        if let Some(start_cap) = silence_start_re.captures(line) {
-            let silence_start = start_cap[1].parse::<f64>().unwrap();
-
-            // Add non-silent part before the silence if it exists
-            if let Some(last_end) = last_silence_end {
-                if last_end < silence_start {
-                    silence_events.push(SilenceEvent {
-                        start: last_end,
-                        end: silence_start,
-                    });
-                }
-            } else if current_position < silence_start {
-                // This handles the non-silent part before the first silence
-                silence_events.push(SilenceEvent {
-                    start: current_position,
-                    end: silence_start,
-                });
-            }
-
-            current_position = silence_start;
-        }
-
-        // Detect silence end
-        if let Some(end_cap) = silence_end_re.captures(line) {
-            let silence_end = end_cap[1].parse::<f64>().unwrap();
-
-            // Add the silent part as well
-            silence_events.push(SilenceEvent {
-                start: current_position,
-                end: silence_end,
-            });
-
-            current_position = silence_end;
-            last_silence_end = Some(silence_end);
-        }
-    }
-
-    // Add the last non-silent part after the last silence, if any
-    if let Some(last_end) = last_silence_end {
-        if last_end < total_duration {
-            silence_events.push(SilenceEvent {
-                start: last_end,
-                end: total_duration,
-            });
-        }
-    } else if current_position < total_duration {
-        // If there was no silence, add the entire remaining part
-        silence_events.push(SilenceEvent {
-            start: current_position,
-            end: total_duration,
-        });
-    }
-
-    silence_events
-}
-
-fn generate_mlt(timestamps: &[SilenceEvent], duration: f64, input_file: &str, output_file: &str) {
+fn generate_mlt(timestamps: &Vec<(f64, f64)>, duration: f64, input_file: &str, output_file: &str) {
     let total_duration = format_time(duration);
 
     let mut mlt_content = String::from(format!(
@@ -159,9 +158,9 @@ fn generate_mlt(timestamps: &[SilenceEvent], duration: f64, input_file: &str, ou
     );
 
     // Add entries to the playlist, linking each chain
-    for (i, event) in timestamps.iter().enumerate() {
-        let start_time = format_time(event.start);
-        let end_time = format_time(event.end);
+    for (i, (start, end)) in timestamps.iter().enumerate() {
+        let start_time = format_time(*start);
+        let end_time = format_time(*end);
         mlt_content.push_str(&format!(
             r#"    <entry producer="chain{}" in="{}" out="{}"/>
 "#,
@@ -186,8 +185,9 @@ fn generate_mlt(timestamps: &[SilenceEvent], duration: f64, input_file: &str, ou
   <track producer="playlist0"/>
 </tractor>
 </mlt>
-"#,total_duration)
-    );
+"#,
+        total_duration
+    ));
 
     let mut file = File::create(output_file).expect("Unable to create file");
     file.write_all(mlt_content.as_bytes())
@@ -211,11 +211,41 @@ pub fn silence(input_video: &str) {
     let input_path = Path::new(input_video);
     let output_mlt = generate_output_mlt_path(input_path);
 
-    let (silence_events, duration) = run_ffmpeg(input_video);
-    println!("Parsed silence events: {:?}", silence_events);
+    let (loud_periods, silent_periods, duration) = run_ffmpeg(input_video);
+
+    println!(
+        "Loud starts at: {}",
+        loud_periods
+            .iter()
+            .map(|x| format!("{:.2}", x))
+            .collect::<Vec<_>>()
+            .join(", ")
+    );
+
+    println!(
+        "Silent starts at: {}",
+        silent_periods
+            .iter()
+            .map(|x| format!("{:.2}", x))
+            .collect::<Vec<_>>()
+            .join(", ")
+    );
+
+    let audio_chunks = find_audio_chunks(&loud_periods, &silent_periods, duration);
+
+    println!(
+        "Audio chunks: {}",
+        audio_chunks
+            .iter()
+            .map(|(start, end)| format!("({:.2}, {:.2})", start, end))
+            .collect::<Vec<_>>()
+            .join(", ")
+    );
+
+    println!("Total duration: {:.2}", duration);
 
     generate_mlt(
-        &silence_events,
+        &audio_chunks,
         duration,
         input_video,
         &output_mlt.to_string_lossy(),
