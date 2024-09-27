@@ -13,7 +13,6 @@ struct SilenceEvent {
 const FFMPEG_EXECUTABLE: &str = r"C:\Program Files\ShotCut\ffmpeg.exe";
 
 fn run_ffmpeg(input_file: &str) -> (Vec<SilenceEvent>, f64) {
-    // Get the total duration of the input video
     let duration_output = Command::new(FFMPEG_EXECUTABLE)
         .arg("-i")
         .arg(input_file)
@@ -26,12 +25,11 @@ fn run_ffmpeg(input_file: &str) -> (Vec<SilenceEvent>, f64) {
 
     let duration = parse_duration(&String::from_utf8_lossy(&duration_output.stderr));
 
-    // Run ffmpeg to detect silence
     let ffmpeg_output = Command::new(FFMPEG_EXECUTABLE)
         .arg("-i")
         .arg(input_file)
         .arg("-af")
-        .arg("silencedetect=noise=-30dB:d=0.25")
+        .arg("silencedetect=noise=-40dB:d=0.9")
         .arg("-f")
         .arg("null")
         .arg("-")
@@ -45,7 +43,6 @@ fn run_ffmpeg(input_file: &str) -> (Vec<SilenceEvent>, f64) {
     (silence_events, duration)
 }
 
-// Helper function to extract total duration from FFmpeg output
 fn parse_duration(output: &str) -> f64 {
     let duration_re = Regex::new(r"Duration: (\d+):(\d+):(\d+)\.(\d+)").unwrap();
     if let Some(cap) = duration_re.captures(output) {
