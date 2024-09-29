@@ -31,8 +31,10 @@ fn run_ffmpeg(input_file: &str) -> (Vec<f64>, Vec<f64>, f64) {
         .output()
         .expect("Failed to execute FFmpeg for loud detection");
 
-    let loud_periods =
-        parse_ffmpeg_output_for_loud(&String::from_utf8_lossy(&loud_ffmpeg_output.stderr));
+    let loud_periods = parse_ffmpeg_output(
+        &String::from_utf8_lossy(&loud_ffmpeg_output.stderr),
+        Regex::new(r"silence_end:\s*(\d+\.?\d*)").unwrap(),
+    );
 
     let silence_ffmpeg_output = Command::new(FFMPEG_EXECUTABLE)
         .arg("-i")
@@ -46,41 +48,27 @@ fn run_ffmpeg(input_file: &str) -> (Vec<f64>, Vec<f64>, f64) {
         .output()
         .expect("Failed to execute FFmpeg for silence detection");
 
-    let silent_periods =
-        parse_ffmpeg_output_for_silence(&String::from_utf8_lossy(&silence_ffmpeg_output.stderr));
+    let silent_periods = parse_ffmpeg_output(
+        &String::from_utf8_lossy(&silence_ffmpeg_output.stderr),
+        Regex::new(r"silence_start:\s*(\d+\.?\d*)").unwrap(),
+    );
 
     (loud_periods, silent_periods, duration)
 }
 
-fn parse_ffmpeg_output_for_loud(output: &str) -> Vec<f64> {
-    let mut loud_periods = Vec::new();
-    let silence_end_re = Regex::new(r"silence_end:\s*(\d+\.?\d*)").unwrap();
-
-    for line in output.lines() {
-        if let Some(end_cap) = silence_end_re.captures(line) {
-            let silence_end = end_cap[1].parse::<f64>().unwrap();
-            loud_periods.push(silence_end); // Non-silent period starts after silence ends
-        }
-    }
-
-    loud_periods
+fn parse_ffmpeg_output(output: &str, pattern: Regex) -> Vec<f64> {
+    output
+        .lines()
+        .filter_map(|line| pattern.captures(line))
+        .filter_map(|cap| cap[1].parse::<f64>().ok())
+        .collect()
 }
 
-fn parse_ffmpeg_output_for_silence(output: &str) -> Vec<f64> {
-    let mut silent_periods = Vec::new();
-    let silence_start_re = Regex::new(r"silence_start:\s*(\d+\.?\d*)").unwrap();
-
-    for line in output.lines() {
-        if let Some(start_cap) = silence_start_re.captures(line) {
-            let silence_start = start_cap[1].parse::<f64>().unwrap();
-            silent_periods.push(silence_start); // Silence starts here
-        }
-    }
-
-    silent_periods
-}
-
-fn find_audio_chunks(loud_periods: &[f64], silent_periods: &[f64], total_duration: f64) -> Vec<(f64, f64)> {
+fn find_audio_chunks(
+    loud_periods: &[f64],
+    silent_periods: &[f64],
+    total_duration: f64,
+) -> Vec<(f64, f64)> {
     let mut all_chunks = Vec::new();
     let mut current_time = 0.0;
 
@@ -203,8 +191,7 @@ fn format_time(seconds: f64) -> String {
 
 fn generate_output_mlt_path(input_path: &Path) -> PathBuf {
     let parent_dir = input_path.parent().unwrap_or_else(|| Path::new("."));
-    let output_mlt = parent_dir.join("output.mlt");
-    output_mlt
+    parent_dir.join("output.mlt")
 }
 
 pub fn silence(input_video: &str) {
