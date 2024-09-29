@@ -23,7 +23,7 @@ fn run_ffmpeg(input_file: &str) -> (Vec<f64>, Vec<f64>, f64) {
         .arg("-i")
         .arg(input_file)
         .arg("-af")
-        .arg("silencedetect=noise=-30dB:d=1")
+        .arg("silencedetect=noise=-30dB:d=0.5")
         .arg("-f")
         .arg("null")
         .arg("-")
