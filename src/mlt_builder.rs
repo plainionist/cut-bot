@@ -81,6 +81,7 @@ impl MltBuilder {
         let mut background_playlist = BytesStart::borrowed_name(b"playlist");
         background_playlist.push_attribute(("id", "background"));
         writer.write_event(Event::Start(background_playlist)).unwrap();
+        
         let mut entry = BytesStart::borrowed_name(b"entry");
         entry.push_attribute(("producer", "black"));
         entry.push_attribute(("in", "00:00:00.000"));
@@ -108,6 +109,7 @@ impl MltBuilder {
         let mut playlist0 = BytesStart::borrowed_name(b"playlist");
         playlist0.push_attribute(("id", "playlist0"));
         writer.write_event(Event::Start(playlist0)).unwrap();
+
         for (i, (start, end)) in self.timestamps.iter().enumerate() {
             let mut entry = BytesStart::borrowed_name(b"entry");
             entry.push_attribute(("producer", &format!("chain{}", i)[..]));
