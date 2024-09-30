@@ -39,7 +39,7 @@ fn find_audio_chunks(
 fn generate_mlt(timestamps: &Vec<(f64, f64)>, duration: f64, input_file: &str, output_file: &str) {
     let total_duration = format_time(duration);
 
-    let mut mlt_content = String::from(format!(
+    let mut content = String::from(format!(
         r#"<?xml version="1.0" standalone="no"?>
 <mlt LC_NUMERIC="C" version="7.27.0" producer="main_bin">
 <profile width="2560" height="1440" progressive="1" sample_aspect_num="1" sample_aspect_den="1" display_aspect_num="16" display_aspect_den="9" frame_rate_num="60000000" frame_rate_den="1000000" colorspace="709"/>
@@ -54,10 +54,8 @@ fn generate_mlt(timestamps: &Vec<(f64, f64)>, duration: f64, input_file: &str, o
         total_duration, total_duration
     ));
 
-    // Add chain elements and corresponding playlist entries
     for (i, _) in timestamps.iter().enumerate() {
-        // Create a chain for each segment
-        mlt_content.push_str(&format!(
+        content.push_str(&format!(
             r#"  <chain id="chain{}" out="{}">
   <property name="resource">{}</property>
 </chain>
@@ -66,31 +64,27 @@ fn generate_mlt(timestamps: &Vec<(f64, f64)>, duration: f64, input_file: &str, o
         ));
     }
 
-    // Start the playlist definition
-    mlt_content.push_str(
+    content.push_str(
         r#"  <playlist id="playlist0">
 "#,
     );
 
-    // Add entries to the playlist, linking each chain
     for (i, (start, end)) in timestamps.iter().enumerate() {
         let start_time = format_time(*start);
         let end_time = format_time(*end);
-        mlt_content.push_str(&format!(
+        content.push_str(&format!(
             r#"    <entry producer="chain{}" in="{}" out="{}"/>
 "#,
             i, start_time, end_time
         ));
     }
 
-    // Close the playlist
-    mlt_content.push_str(
+    content.push_str(
         r#"  </playlist>
 "#,
     );
 
-    // Add tractor element with background and playlist tracks
-    mlt_content.push_str(&format!(
+    content.push_str(&format!(
         r#"  <tractor id="tractor0" in="00:00:00.000" out="{}">
   <property name="shotcut">1</property>
   <property name="shotcut:projectAudioChannels">2</property>
@@ -105,7 +99,7 @@ fn generate_mlt(timestamps: &Vec<(f64, f64)>, duration: f64, input_file: &str, o
     ));
 
     let mut file = File::create(output_file).expect("Unable to create file");
-    file.write_all(mlt_content.as_bytes())
+    file.write_all(content.as_bytes())
         .expect("Unable to write data");
 }
 
