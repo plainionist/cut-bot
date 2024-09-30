@@ -1,61 +1,50 @@
 use regex::Regex;
+use std::error::Error;
 use std::process::{Command, Stdio};
 
-const FFMPEG_EXECUTABLE: &str = r"C:\Program Files\ShotCut\ffmpeg.exe";
+const FFMPEG_EXECUTABLE: &str = r"C:\Program Files\ShotCut\ffmpeg.exe"; 
 
-pub fn extract_silence_starts(input_file: &str) -> Vec<f64> {
+pub fn extract_silence_starts(input_file: &str) -> Result<Vec<f64>, Box<dyn Error>> {
+    let pattern = Regex::new(r"silence_start:\s*(\d+\.?\d*)")?;
+    run_silence_detect(input_file, "-60dB", "0.1", pattern)
+}
+
+pub fn extract_loud_starts(input_file: &str) -> Result<Vec<f64>, Box<dyn Error>> {
+    let pattern = Regex::new(r"silence_end:\s*(\d+\.?\d*)")?;
+    run_silence_detect(input_file, "-30dB", "0.5", pattern)
+}
+
+pub fn extract_duration(input_file: &str) -> Result<f64, Box<dyn Error>> {
     let output = Command::new(FFMPEG_EXECUTABLE)
         .arg("-i")
         .arg(input_file)
-        .arg("-af")
-        .arg("silencedetect=noise=-60dB:d=0.1")
         .arg("-f")
         .arg("null")
         .arg("-")
         .stderr(Stdio::piped())
-        .output()
-        .expect("Failed to execute FFmpeg for silence detection");
+        .output()?;
 
-    parse_output(
-        &String::from_utf8_lossy(&output.stderr),
-        Regex::new(r"silence_start:\s*(\d+\.?\d*)").unwrap(),
-    )
+    parse_duration(&String::from_utf8_lossy(&output.stderr))
 }
 
-pub fn extract_loud_starts(input_file: &str) -> Vec<f64> {
+fn run_silence_detect(
+    input_file: &str,
+    noise: &str,
+    duration: &str,
+    pattern: Regex,
+) -> Result<Vec<f64>, Box<dyn Error>> {
     let output = Command::new(FFMPEG_EXECUTABLE)
         .arg("-i")
         .arg(input_file)
         .arg("-af")
-        .arg("silencedetect=noise=-30dB:d=0.5")
+        .arg(&format!("silencedetect=noise={}:d={}", noise, duration))
         .arg("-f")
         .arg("null")
         .arg("-")
         .stderr(Stdio::piped())
-        .output()
-        .expect("Failed to execute FFmpeg for loud detection");
-    
-    parse_output(
-        &String::from_utf8_lossy(&output.stderr),
-        Regex::new(r"silence_end:\s*(\d+\.?\d*)").unwrap(),
-    )
-}
+        .output()?;
 
-pub fn extract_duration(input_file: &str) -> f64 {
-    let output = Command::new(FFMPEG_EXECUTABLE)
-        .arg("-i")
-        .arg(input_file)
-        .arg("-f")
-        .arg("null")
-        .arg("-")
-        .stderr(Stdio::piped()) // FFmpeg writes to stderr, so we capture that
-        .output()
-        .expect("Failed to execute FFmpeg for duration");
-
-    match parse_duration(&String::from_utf8_lossy(&output.stderr)) {
-      Ok(duration) => duration,
-      Err(_) => 0.0
-    }
+    Ok(parse_output(&String::from_utf8_lossy(&output.stderr), pattern))
 }
 
 fn parse_output(output: &str, pattern: Regex) -> Vec<f64> {
@@ -66,7 +55,7 @@ fn parse_output(output: &str, pattern: Regex) -> Vec<f64> {
         .collect()
 }
 
-fn parse_duration(output: &str) -> Result<f64, Box<dyn std::error::Error>> {
+fn parse_duration(output: &str) -> Result<f64, Box<dyn Error>> {
     let duration_re = Regex::new(r"Duration: (\d+):(\d+):(\d+)\.(\d+)")?;
 
     if let Some(cap) = duration_re.captures(output) {

@@ -125,11 +125,11 @@ pub fn silence(input_video: &str) {
     let input_path = Path::new(input_video);
     let output_mlt = generate_output_mlt_path(input_path);
 
-    let duration = ffmpeg::extract_duration(input_video);
+    let duration = ffmpeg::extract_duration(input_video).unwrap_or_default();
 
-    let loud_periods = ffmpeg::extract_loud_starts(input_video);
+    let loud_periods = ffmpeg::extract_loud_starts(input_video).unwrap_or_default();
 
-    let silent_periods = ffmpeg::extract_silence_starts(input_video);
+    let silent_periods = ffmpeg::extract_silence_starts(input_video).unwrap_or_default();
 
     println!(
         "Loud starts at: {}",
