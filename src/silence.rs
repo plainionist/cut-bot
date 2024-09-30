@@ -1,7 +1,6 @@
-use std::fs::File;
-use std::io::Write;
 use std::path::{Path, PathBuf};
 use crate::ffmpeg;
+use crate::mlt_builder;
 
 fn find_audio_chunks(
     loud_periods: &[f64],
@@ -37,77 +36,12 @@ fn find_audio_chunks(
 }
 
 fn generate_mlt(timestamps: &Vec<(f64, f64)>, duration: f64, input_file: &str, output_file: &str) {
-    let total_duration = format_time(duration);
-
-    let mut content = String::from(format!(
-        r#"<?xml version="1.0" standalone="no"?>
-<mlt LC_NUMERIC="C" version="7.27.0" producer="main_bin">
-<profile width="2560" height="1440" progressive="1" sample_aspect_num="1" sample_aspect_den="1" display_aspect_num="16" display_aspect_den="9" frame_rate_num="60000000" frame_rate_den="1000000" colorspace="709"/>
-<playlist id="main_bin">
-</playlist>
-<producer id="black" in="00:00:00.000" out="{}">
-</producer>
-<playlist id="background">
-  <entry producer="black" in="00:00:00.000" out="{}"/>
-</playlist>
-"#,
-        total_duration, total_duration
-    ));
-
-    for (i, _) in timestamps.iter().enumerate() {
-        content.push_str(&format!(
-            r#"  <chain id="chain{}" out="{}">
-  <property name="resource">{}</property>
-</chain>
-"#,
-            i, total_duration, input_file
-        ));
-    }
-
-    content.push_str(
-        r#"  <playlist id="playlist0">
-"#,
-    );
-
-    for (i, (start, end)) in timestamps.iter().enumerate() {
-        let start_time = format_time(*start);
-        let end_time = format_time(*end);
-        content.push_str(&format!(
-            r#"    <entry producer="chain{}" in="{}" out="{}"/>
-"#,
-            i, start_time, end_time
-        ));
-    }
-
-    content.push_str(
-        r#"  </playlist>
-"#,
-    );
-
-    content.push_str(&format!(
-        r#"  <tractor id="tractor0" in="00:00:00.000" out="{}">
-  <property name="shotcut">1</property>
-  <property name="shotcut:projectAudioChannels">2</property>
-  <property name="shotcut:projectFolder">0</property>
-  <property name="shotcut:skipConvert">0</property>
-  <track producer="background"/>
-  <track producer="playlist0"/>
-</tractor>
-</mlt>
-"#,
-        total_duration
-    ));
-
-    let mut file = File::create(output_file).expect("Unable to create file");
-    file.write_all(content.as_bytes())
-        .expect("Unable to write data");
-}
-
-fn format_time(seconds: f64) -> String {
-    let hours = (seconds / 3600.0).floor() as u32;
-    let minutes = ((seconds % 3600.0) / 60.0).floor() as u32;
-    let seconds = seconds % 60.0;
-    format!("{:02}:{:02}:{:06.3}", hours, minutes, seconds)
+    mlt_builder::MltBuilder::new()
+        .timestamps(timestamps.clone())
+        .duration(duration)
+        .input_file(input_file)
+        .output_file(output_file)
+        .build();
 }
 
 fn generate_output_mlt_path(input_path: &Path) -> PathBuf {
