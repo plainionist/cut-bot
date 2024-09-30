@@ -1,5 +1,6 @@
 mod concat;
 mod silence;
+mod ffmpeg;
 
 use concat::concat_mkv;
 use silence::silence;

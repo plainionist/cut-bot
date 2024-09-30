@@ -1,70 +1,7 @@
-use regex::Regex;
 use std::fs::File;
 use std::io::Write;
 use std::path::{Path, PathBuf};
-use std::process::{Command, Stdio};
-
-const FFMPEG_EXECUTABLE: &str = r"C:\Program Files\ShotCut\ffmpeg.exe";
-
-fn extract_silence_starts(input_file: &str) -> Vec<f64> {
-    let silence_ffmpeg_output = Command::new(FFMPEG_EXECUTABLE)
-        .arg("-i")
-        .arg(input_file)
-        .arg("-af")
-        .arg("silencedetect=noise=-60dB:d=0.1")
-        .arg("-f")
-        .arg("null")
-        .arg("-")
-        .stderr(Stdio::piped())
-        .output()
-        .expect("Failed to execute FFmpeg for silence detection");
-
-    let silent_periods = parse_ffmpeg_output(
-        &String::from_utf8_lossy(&silence_ffmpeg_output.stderr),
-        Regex::new(r"silence_start:\s*(\d+\.?\d*)").unwrap(),
-    );
-    silent_periods
-}
-
-fn extract_loud_starts(input_file: &str) -> Vec<f64> {
-    let loud_ffmpeg_output = Command::new(FFMPEG_EXECUTABLE)
-        .arg("-i")
-        .arg(input_file)
-        .arg("-af")
-        .arg("silencedetect=noise=-30dB:d=0.5")
-        .arg("-f")
-        .arg("null")
-        .arg("-")
-        .stderr(Stdio::piped())
-        .output()
-        .expect("Failed to execute FFmpeg for loud detection");
-    
-    parse_ffmpeg_output(
-        &String::from_utf8_lossy(&loud_ffmpeg_output.stderr),
-        Regex::new(r"silence_end:\s*(\d+\.?\d*)").unwrap(),
-    )
-}
-
-fn extract_duration(input_file: &str) -> f64 {
-    let duration_output = Command::new(FFMPEG_EXECUTABLE)
-        .arg("-i")
-        .arg(input_file)
-        .arg("-f")
-        .arg("null")
-        .arg("-")
-        .stderr(Stdio::piped()) // FFmpeg writes to stderr, so we capture that
-        .output()
-        .expect("Failed to execute FFmpeg for duration");
-    parse_duration(&String::from_utf8_lossy(&duration_output.stderr))
-}
-
-fn parse_ffmpeg_output(output: &str, pattern: Regex) -> Vec<f64> {
-    output
-        .lines()
-        .filter_map(|line| pattern.captures(line))
-        .filter_map(|cap| cap[1].parse::<f64>().ok())
-        .collect()
-}
+use crate::ffmpeg;
 
 fn find_audio_chunks(
     loud_periods: &[f64],
@@ -97,18 +34,6 @@ fn find_audio_chunks(
     }
 
     all_chunks
-}
-
-fn parse_duration(output: &str) -> f64 {
-    let duration_re = Regex::new(r"Duration: (\d+):(\d+):(\d+)\.(\d+)").unwrap();
-    if let Some(cap) = duration_re.captures(output) {
-        let hours: f64 = cap[1].parse().unwrap();
-        let minutes: f64 = cap[2].parse().unwrap();
-        let seconds: f64 = cap[3].parse().unwrap();
-        let millis: f64 = cap[4].parse().unwrap();
-        return hours * 3600.0 + minutes * 60.0 + seconds + (millis / 100.0);
-    }
-    0.0
 }
 
 fn generate_mlt(timestamps: &Vec<(f64, f64)>, duration: f64, input_file: &str, output_file: &str) {
@@ -200,11 +125,11 @@ pub fn silence(input_video: &str) {
     let input_path = Path::new(input_video);
     let output_mlt = generate_output_mlt_path(input_path);
 
-    let duration = extract_duration(input_video);
+    let duration = ffmpeg::extract_duration(input_video);
 
-    let loud_periods = extract_loud_starts(input_video);
+    let loud_periods = ffmpeg::extract_loud_starts(input_video);
 
-    let silent_periods = extract_silence_starts(input_video);
+    let silent_periods = ffmpeg::extract_silence_starts(input_video);
 
     println!(
         "Loud starts at: {}",
