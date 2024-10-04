@@ -16,6 +16,11 @@ fn main() {
         let input_file = &args[2];
         silence(input_file);
     } else {
-        eprintln!("Usage: cut-bot <concat|silence> <input_folder>");
+        eprintln!("Usage: cut-bot <command> <input_folder>");
+        eprintln!("");
+        eprintln!("Commands: ");
+        eprintln!("    silence   - creates ShotCut project with silent parts marked");
+        //eprintln!("    concat    - concatenates multiple mkv files in order");
+        eprintln!("");
     }
 }
