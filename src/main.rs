@@ -16,6 +16,6 @@ fn main() {
         let input_file = &args[2];
         silence(input_file);
     } else {
-        eprintln!("Usage: cut-bot concat <input_folder>");
+        eprintln!("Usage: cut-bot <concat|silence> <input_folder>");
     }
 }
