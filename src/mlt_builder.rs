@@ -76,12 +76,28 @@ impl MltBuilder {
         producer.push_attribute(("id", "black"));
         producer.push_attribute(("in", "00:00:00.000"));
         producer.push_attribute(("out", &total_duration[..]));
-        writer.write_event(Event::Empty(producer)).unwrap();
+        writer.write_event(Event::Start(producer)).unwrap();
+        
+        let mut resource_property = BytesStart::borrowed_name(b"property");
+        resource_property.push_attribute(("name", "resource"));
+        writer.write_event(Event::Start(resource_property)).unwrap();
+        writer.write_event(Event::Text(BytesText::from_plain_str("0"))).unwrap();
+        writer.write_event(Event::End(BytesEnd::borrowed(b"property"))).unwrap();
+
+        let mut mlt_service_property = BytesStart::borrowed_name(b"property");
+        mlt_service_property.push_attribute(("name", "mlt_service"));
+        writer.write_event(Event::Start(mlt_service_property)).unwrap();
+        writer
+            .write_event(Event::Text(BytesText::from_plain_str("color")))
+            .unwrap();
+        writer.write_event(Event::End(BytesEnd::borrowed(b"property"))).unwrap();
+
+        writer.write_event(Event::End(BytesEnd::borrowed(b"producer"))).unwrap();
 
         let mut background_playlist = BytesStart::borrowed_name(b"playlist");
         background_playlist.push_attribute(("id", "background"));
         writer.write_event(Event::Start(background_playlist)).unwrap();
-        
+
         let mut entry = BytesStart::borrowed_name(b"entry");
         entry.push_attribute(("producer", "black"));
         entry.push_attribute(("in", "00:00:00.000"));
@@ -124,6 +140,22 @@ impl MltBuilder {
         tractor.push_attribute(("in", "00:00:00.000"));
         tractor.push_attribute(("out", &total_duration[..]));
         writer.write_event(Event::Start(tractor)).unwrap();
+
+        let mut property = BytesStart::borrowed_name(b"property");
+        property.push_attribute(("name", "shotcut"));
+        writer.write_event(Event::Start(property)).unwrap();
+        writer.write_event(Event::Text(BytesText::from_plain_str("1"))).unwrap();
+        writer.write_event(Event::End(BytesEnd::borrowed(b"property"))).unwrap();
+
+        let mut track_bg = BytesStart::borrowed_name(b"track");
+        track_bg.push_attribute(("producer", "background"));
+        writer.write_event(Event::Empty(track_bg)).unwrap();
+
+        let mut track_playlist = BytesStart::borrowed_name(b"track");
+        track_playlist.push_attribute(("producer", "playlist0"));
+        writer.write_event(Event::Empty(track_playlist)).unwrap();
+
+        writer.write_event(Event::End(BytesEnd::borrowed(b"tractor"))).unwrap();
 
         writer.write_event(Event::End(BytesEnd::borrowed(b"mlt"))).unwrap();
     }
