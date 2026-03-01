@@ -1,3 +1,4 @@
+use std::fs;
 use std::path::Path;
 use crate::ffmpeg;
 use crate::mlt_builder::MltBuilder;
@@ -35,34 +36,72 @@ fn find_audio_chunks(
     chunks
 }
 
-fn generate_output_mlt_path(input_video: &str) -> String {
-    let input_path = Path::new(input_video);
-    let parent_dir = input_path.parent().unwrap_or_else(|| Path::new("."));
-    parent_dir.join("output.mlt").to_string_lossy().to_string()
+fn find_mkv_files(folder: &str) -> Vec<String> {
+    let mut files: Vec<String> = fs::read_dir(folder)
+        .expect("Failed to read input folder")
+        .filter_map(|entry| {
+            let entry = entry.ok()?;
+            let path = entry.path();
+            if path.extension().and_then(|e| e.to_str()) == Some("mkv") {
+                Some(path.to_string_lossy().to_string())
+            } else {
+                None
+            }
+        })
+        .collect();
+    files.sort();
+    files
 }
 
-pub fn silence(input_video: &str) {
-    let output_mlt = generate_output_mlt_path(input_video);
+pub fn silence(input_folder: &str) {
+    let mkv_files = find_mkv_files(input_folder);
+    if mkv_files.is_empty() {
+        eprintln!("No .mkv files found in folder: {}", input_folder);
+        return;
+    }
 
-    let duration = ffmpeg::extract_duration(input_video).unwrap_or_default();
-    let loud_periods = ffmpeg::extract_loud_starts(input_video).unwrap_or_default();
-    let silent_periods = ffmpeg::extract_silence_starts(input_video).unwrap_or_default();
+    println!("Found {} .mkv file(s):", mkv_files.len());
+    for f in &mkv_files {
+        println!("  {}", f);
+    }
 
-    let audio_chunks = find_audio_chunks(&loud_periods, &silent_periods, duration);
+    let output_mlt = Path::new(input_folder)
+        .join("output.mlt")
+        .to_string_lossy()
+        .to_string();
 
-    println!(
-        "Audio chunks: {}",
-        audio_chunks
-            .iter()
-            .map(|(start, end)| format!("({:.2}, {:.2})", start, end))
-            .collect::<Vec<_>>()
-            .join(", ")
-    );
+    let mut all_chunks: Vec<(String, f64, f64)> = Vec::new();
+    let mut total_duration = 0.0;
+
+    for file in &mkv_files {
+        let duration = ffmpeg::extract_duration(file).unwrap_or_default();
+        let loud_periods = ffmpeg::extract_loud_starts(file).unwrap_or_default();
+        let silent_periods = ffmpeg::extract_silence_starts(file).unwrap_or_default();
+
+        let audio_chunks = find_audio_chunks(&loud_periods, &silent_periods, duration);
+
+        println!(
+            "Audio chunks for {}: {}",
+            file,
+            audio_chunks
+                .iter()
+                .map(|(start, end)| format!("({:.2}, {:.2})", start, end))
+                .collect::<Vec<_>>()
+                .join(", ")
+        );
+
+        for (start, end) in &audio_chunks {
+            all_chunks.push((file.clone(), *start, *end));
+        }
+
+        if duration > total_duration {
+            total_duration = duration;
+        }
+    }
 
     MltBuilder::new()
-        .timestamps(audio_chunks.clone())
-        .duration(duration)
-        .input_file(input_video)
+        .chunks(all_chunks)
+        .duration(total_duration)
         .output_file(&output_mlt)
         .build();
 

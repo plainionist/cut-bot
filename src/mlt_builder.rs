@@ -3,34 +3,27 @@ use quick_xml::Writer;
 use std::fs::File;
 
 pub struct MltBuilder {
-    timestamps: Vec<(f64, f64)>,
+    chunks: Vec<(String, f64, f64)>,
     duration: f64,
-    input_file: String,
     output_file: String,
 }
 
 impl MltBuilder {
     pub fn new() -> Self {
         MltBuilder {
-            timestamps: Vec::new(),
+            chunks: Vec::new(),
             duration: 0.0,
-            input_file: String::new(),
             output_file: String::new(),
         }
     }
 
-    pub fn timestamps(mut self, timestamps: Vec<(f64, f64)>) -> Self {
-        self.timestamps = timestamps;
+    pub fn chunks(mut self, chunks: Vec<(String, f64, f64)>) -> Self {
+        self.chunks = chunks;
         self
     }
 
     pub fn duration(mut self, duration: f64) -> Self {
         self.duration = duration;
-        self
-    }
-
-    pub fn input_file(mut self, input_file: &str) -> Self {
-        self.input_file = input_file.to_string();
         self
     }
 
@@ -105,7 +98,7 @@ impl MltBuilder {
         writer.write_event(Event::Empty(entry)).unwrap();
         writer.write_event(Event::End(BytesEnd::borrowed(b"playlist"))).unwrap();
 
-        for (i, _) in self.timestamps.iter().enumerate() {
+        for (i, (file, _, _)) in self.chunks.iter().enumerate() {
             let mut chain = BytesStart::borrowed_name(b"chain");
             chain.push_attribute(("id", &format!("chain{}", i)[..]));
             chain.push_attribute(("out", &total_duration[..]));
@@ -115,7 +108,7 @@ impl MltBuilder {
             property.push_attribute(("name", "resource"));
             writer.write_event(Event::Start(property)).unwrap();
             writer
-                .write_event(Event::Text(BytesText::from_plain_str(&self.input_file)))
+                .write_event(Event::Text(BytesText::from_plain_str(file)))
                 .unwrap();
             writer.write_event(Event::End(BytesEnd::borrowed(b"property"))).unwrap();
 
@@ -126,7 +119,7 @@ impl MltBuilder {
         playlist0.push_attribute(("id", "playlist0"));
         writer.write_event(Event::Start(playlist0)).unwrap();
 
-        for (i, (start, end)) in self.timestamps.iter().enumerate() {
+        for (i, (_, start, end)) in self.chunks.iter().enumerate() {
             let mut entry = BytesStart::borrowed_name(b"entry");
             entry.push_attribute(("producer", &format!("chain{}", i)[..]));
             entry.push_attribute(("in", &format_time(*start)[..]));
