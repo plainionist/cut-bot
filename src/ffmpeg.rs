@@ -23,7 +23,7 @@ pub fn extract_loud_starts(input_file: &str) -> Result<Vec<f64>, Box<dyn Error>>
     check_ffmpeg();
     let pattern = Regex::new(r"silence_end:\s*(\d+\.?\d*)")?;
     let timestamps = run_silence_detect(input_file, "-30dB", "0.5", pattern)?;
-    Ok(timestamps.into_iter().map(|t| (t - 0.1).max(0.0)).collect())
+    Ok(timestamps.into_iter().map(|t| (t - 0.07).max(0.0)).collect())
 }
 
 pub fn extract_duration(input_file: &str) -> Result<f64, Box<dyn Error>> {
