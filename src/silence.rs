@@ -74,9 +74,12 @@ pub fn silence(input_folder: &str) {
     let mut total_duration = 0.0;
 
     for file in &mkv_files {
-        let duration = ffmpeg::extract_duration(file).unwrap_or_default();
-        let loud_periods = ffmpeg::extract_loud_starts(file).unwrap_or_default();
-        let silent_periods = ffmpeg::extract_silence_starts(file).unwrap_or_default();
+        let duration = ffmpeg::extract_duration(file)
+            .unwrap_or_else(|e| panic!("Failed to extract duration from '{}': {}", file, e));
+        let loud_periods = ffmpeg::extract_loud_starts(file)
+            .unwrap_or_else(|e| panic!("Failed to extract loud starts from '{}': {}", file, e));
+        let silent_periods = ffmpeg::extract_silence_starts(file)
+            .unwrap_or_else(|e| panic!("Failed to extract silence starts from '{}': {}", file, e));
 
         let audio_chunks = find_audio_chunks(&loud_periods, &silent_periods, duration);
 

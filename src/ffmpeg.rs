@@ -1,20 +1,32 @@
 use regex::Regex;
 use std::error::Error;
+use std::path::Path;
 use std::process::{Command, Stdio};
 
-const FFMPEG_EXECUTABLE: &str = r"C:\Program Files\ShotCut\ffmpeg.exe"; 
+const FFMPEG_EXECUTABLE: &str = r"C:\bin\ffmpeg\bin\ffmpeg.exe"; 
+
+fn check_ffmpeg() {
+    if !Path::new(FFMPEG_EXECUTABLE).exists() {
+        eprintln!("Error: ffmpeg not found at '{}'", FFMPEG_EXECUTABLE);
+        eprintln!("Please install ShotCut or update FFMPEG_EXECUTABLE in ffmpeg.rs to point to your ffmpeg installation.");
+        std::process::exit(1);
+    }
+}
 
 pub fn extract_silence_starts(input_file: &str) -> Result<Vec<f64>, Box<dyn Error>> {
+    check_ffmpeg();
     let pattern = Regex::new(r"silence_start:\s*(\d+\.?\d*)")?;
     run_silence_detect(input_file, "-60dB", "0.1", pattern)
 }
 
 pub fn extract_loud_starts(input_file: &str) -> Result<Vec<f64>, Box<dyn Error>> {
+    check_ffmpeg();
     let pattern = Regex::new(r"silence_end:\s*(\d+\.?\d*)")?;
     run_silence_detect(input_file, "-30dB", "0.5", pattern)
 }
 
 pub fn extract_duration(input_file: &str) -> Result<f64, Box<dyn Error>> {
+    check_ffmpeg();
     let output = Command::new(FFMPEG_EXECUTABLE)
         .arg("-i")
         .arg(input_file)
