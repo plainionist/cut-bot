@@ -53,10 +53,16 @@ fn find_mkv_files(folder: &str) -> Vec<String> {
     files
 }
 
-pub fn silence(input_folder: &str) {
-    let mkv_files = find_mkv_files(input_folder);
+pub fn silence(input_path: &str) {
+    let path = Path::new(input_path);
+    let mkv_files = if path.is_file() {
+        vec![input_path.to_string()]
+    } else {
+        find_mkv_files(input_path)
+    };
+
     if mkv_files.is_empty() {
-        eprintln!("No .mkv files found in folder: {}", input_folder);
+        eprintln!("No .mkv files found in: {}", input_path);
         return;
     }
 
@@ -65,10 +71,18 @@ pub fn silence(input_folder: &str) {
         println!("  {}", f);
     }
 
-    let output_mlt = Path::new(input_folder)
-        .join("output.mlt")
-        .to_string_lossy()
-        .to_string();
+    let output_mlt = if path.is_file() {
+        path.parent()
+            .unwrap_or_else(|| Path::new("."))
+            .join("output.mlt")
+            .to_string_lossy()
+            .to_string()
+    } else {
+        Path::new(input_path)
+            .join("output.mlt")
+            .to_string_lossy()
+            .to_string()
+    };
 
     let mut all_chunks: Vec<(String, f64, f64)> = Vec::new();
     let mut total_duration = 0.0;
