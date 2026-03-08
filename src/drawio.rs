@@ -1,70 +1,46 @@
-use crate::config;
+use crate::tool;
 use quick_xml::events::Event;
 use quick_xml::Reader;
 use std::fs;
-use std::process::Command;
 
 pub fn export_drawio(drawio_file: &str) {
-    let drawio_executable = match config::get_value("drawio_executable") {
-        Ok(value) => value,
-        Err(error) => {
-            eprintln!("Error reading draw.io config: {}", error);
-            std::process::exit(1);
-        }
-    };
-
-    let page_names = match extract_page_names(drawio_file) {
-        Ok(page_names) => page_names,
-        Err(error) => {
-            eprintln!("Failed to read draw.io file '{}': {}", drawio_file, error);
-            std::process::exit(1);
-        }
-    };
-
-    if page_names.is_empty() {
-        eprintln!("No pages found in '{}'", drawio_file);
+    if let Err(error) = run_export_drawio(drawio_file) {
+        eprintln!("{}", error);
         std::process::exit(1);
+    }
+}
+
+fn run_export_drawio(drawio_file: &str) -> Result<(), Box<dyn std::error::Error>> {
+    let drawio_executable = tool::required_executable("drawio_executable")?;
+    tool::validate_executable(&drawio_executable, "draw.io")?;
+
+    let page_names = extract_page_names(drawio_file)?;
+    if page_names.is_empty() {
+        return Err(format!("No pages found in '{}'", drawio_file).into());
     }
 
     for (page_index, page_name) in page_names.iter().enumerate() {
-        let output_file = format!("{}.png", page_name);
+        let output_file = format!("{}.png", sanitize_file_name(page_name));
         println!("Exporting {}", page_name);
 
-        let status = Command::new(&drawio_executable)
-            .arg("--width")
-            .arg("2560")
-            .arg("--height")
-            .arg("1440")
-            .arg("--export")
-            .arg("--output")
-            .arg(&output_file)
-            .arg("--page-index")
-            .arg(page_index.to_string())
-            .arg("--transparent")
-            .arg(drawio_file)
-            .status();
+        let args = vec![
+            "--width".to_string(),
+            "2560".to_string(),
+            "--height".to_string(),
+            "1440".to_string(),
+            "--export".to_string(),
+            "--output".to_string(),
+            output_file,
+            "--page-index".to_string(),
+            page_index.to_string(),
+            "--transparent".to_string(),
+            drawio_file.to_string(),
+        ];
 
-        match status {
-            Ok(status) if status.success() => {}
-            Ok(status) => {
-                eprintln!(
-                    "draw.io failed for page '{}' with exit code {:?}",
-                    page_name,
-                    status.code()
-                );
-                std::process::exit(1);
-            }
-            Err(error) => {
-                eprintln!(
-                    "Failed to execute '{}' for '{}': {}",
-                    drawio_executable,
-                    drawio_file,
-                    error
-                );
-                std::process::exit(1);
-            }
-        }
+        tool::run_command(&drawio_executable, &args, &format!("page '{}'", page_name))?;
     }
+
+    Ok(())
 }
 
 fn extract_page_names(drawio_file: &str) -> Result<Vec<String>, Box<dyn std::error::Error>> {
@@ -93,4 +69,21 @@ fn extract_page_names(drawio_file: &str) -> Result<Vec<String>, Box<dyn std::err
     }
 
     Ok(page_names)
+}
+
+fn sanitize_file_name(name: &str) -> String {
+    let sanitized: String = name
+        .chars()
+        .map(|character| match character {
+            '<' | '>' | ':' | '"' | '/' | '\\' | '|' | '?' | '*' => '_',
+            _ => character,
+        })
+        .collect();
+
+    let trimmed = sanitized.trim().trim_end_matches('.').to_string();
+    if trimmed.is_empty() {
+        "page".to_string()
+    } else {
+        trimmed
+    }
 }

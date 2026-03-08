@@ -3,7 +3,9 @@ mod border;
 mod config;
 mod drawio;
 mod ffmpeg;
+mod image_command;
 mod mlt_builder;
+mod tool;
 mod transparent;
 
 use border::add_borders;

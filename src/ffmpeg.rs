@@ -1,46 +1,29 @@
 use regex::Regex;
-use crate::config;
+use crate::tool;
 use std::error::Error;
-use std::path::Path;
 use std::process::{Command, Stdio};
 
-fn check_ffmpeg() -> String {
-    let ffmpeg_executable = match config::get_value("ffmpeg_executable") {
-        Ok(value) => value,
-        Err(error) => {
-            eprintln!("Error reading ffmpeg config: {}", error);
-            std::process::exit(1);
-        }
-    };
-
-    if !Path::new(&ffmpeg_executable).exists() {
-        let config_path = config::config_path()
-            .map(|path| path.display().to_string())
-            .unwrap_or_else(|_| "cut-bot.conf".to_string());
-
-        eprintln!("Error: ffmpeg not found at '{}'", ffmpeg_executable);
-        eprintln!("Update 'ffmpeg_executable' in {} to point to your ffmpeg installation.", config_path);
-        std::process::exit(1);
-    }
-
-    ffmpeg_executable
+fn ffmpeg_executable() -> Result<String, Box<dyn Error>> {
+    let executable = tool::required_executable("ffmpeg_executable")?;
+    tool::validate_executable(&executable, "ffmpeg")?;
+    Ok(executable)
 }
 
 pub fn extract_silence_starts(input_file: &str) -> Result<Vec<f64>, Box<dyn Error>> {
-    let ffmpeg_executable = check_ffmpeg();
+    let ffmpeg_executable = ffmpeg_executable()?;
     let pattern = Regex::new(r"silence_start:\s*(\d+\.?\d*)")?;
     run_silence_detect(&ffmpeg_executable, input_file, "-60dB", "0.1", pattern)
 }
 
 pub fn extract_loud_starts(input_file: &str) -> Result<Vec<f64>, Box<dyn Error>> {
-    let ffmpeg_executable = check_ffmpeg();
+    let ffmpeg_executable = ffmpeg_executable()?;
     let pattern = Regex::new(r"silence_end:\s*(\d+\.?\d*)")?;
     let timestamps = run_silence_detect(&ffmpeg_executable, input_file, "-30dB", "0.5", pattern)?;
     Ok(timestamps.into_iter().map(|t| (t - 0.07).max(0.0)).collect())
 }
 
 pub fn extract_duration(input_file: &str) -> Result<f64, Box<dyn Error>> {
-    let ffmpeg_executable = check_ffmpeg();
+    let ffmpeg_executable = ffmpeg_executable()?;
     let output = Command::new(&ffmpeg_executable)
         .arg("-i")
         .arg(input_file)
