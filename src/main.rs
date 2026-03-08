@@ -1,4 +1,5 @@
 mod silence;
+mod config;
 mod ffmpeg;
 mod mlt_builder;
 
@@ -15,7 +16,7 @@ fn main() {
         eprintln!("Usage: cut-bot <command> <input> <output>");
         eprintln!("");
         eprintln!("Commands: ");
-        eprintln!("    silence <input> <output.mlt>  - creates ShotCut project with silent parts marked");
+        eprintln!("    silence <input> <output.mlt> - creates ShotCut project with silent parts marked");
         eprintln!("                                   input: folder with .mkv files or single file");
         eprintln!("");
     }

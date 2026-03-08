@@ -1,34 +1,47 @@
 use regex::Regex;
+use crate::config;
 use std::error::Error;
 use std::path::Path;
 use std::process::{Command, Stdio};
 
-const FFMPEG_EXECUTABLE: &str = r"C:\bin\ffmpeg\bin\ffmpeg.exe"; 
+fn check_ffmpeg() -> String {
+    let ffmpeg_executable = match config::get_value("ffmpeg_executable") {
+        Ok(value) => value,
+        Err(error) => {
+            eprintln!("Error reading ffmpeg config: {}", error);
+            std::process::exit(1);
+        }
+    };
 
-fn check_ffmpeg() {
-    if !Path::new(FFMPEG_EXECUTABLE).exists() {
-        eprintln!("Error: ffmpeg not found at '{}'", FFMPEG_EXECUTABLE);
-        eprintln!("Please install ShotCut or update FFMPEG_EXECUTABLE in ffmpeg.rs to point to your ffmpeg installation.");
+    if !Path::new(&ffmpeg_executable).exists() {
+        let config_path = config::config_path()
+            .map(|path| path.display().to_string())
+            .unwrap_or_else(|_| "cut-bot.conf".to_string());
+
+        eprintln!("Error: ffmpeg not found at '{}'", ffmpeg_executable);
+        eprintln!("Update 'ffmpeg_executable' in {} to point to your ffmpeg installation.", config_path);
         std::process::exit(1);
     }
+
+    ffmpeg_executable
 }
 
 pub fn extract_silence_starts(input_file: &str) -> Result<Vec<f64>, Box<dyn Error>> {
-    check_ffmpeg();
+    let ffmpeg_executable = check_ffmpeg();
     let pattern = Regex::new(r"silence_start:\s*(\d+\.?\d*)")?;
-    run_silence_detect(input_file, "-60dB", "0.1", pattern)
+    run_silence_detect(&ffmpeg_executable, input_file, "-60dB", "0.1", pattern)
 }
 
 pub fn extract_loud_starts(input_file: &str) -> Result<Vec<f64>, Box<dyn Error>> {
-    check_ffmpeg();
+    let ffmpeg_executable = check_ffmpeg();
     let pattern = Regex::new(r"silence_end:\s*(\d+\.?\d*)")?;
-    let timestamps = run_silence_detect(input_file, "-30dB", "0.5", pattern)?;
+    let timestamps = run_silence_detect(&ffmpeg_executable, input_file, "-30dB", "0.5", pattern)?;
     Ok(timestamps.into_iter().map(|t| (t - 0.07).max(0.0)).collect())
 }
 
 pub fn extract_duration(input_file: &str) -> Result<f64, Box<dyn Error>> {
-    check_ffmpeg();
-    let output = Command::new(FFMPEG_EXECUTABLE)
+    let ffmpeg_executable = check_ffmpeg();
+    let output = Command::new(&ffmpeg_executable)
         .arg("-i")
         .arg(input_file)
         .arg("-f")
@@ -41,12 +54,13 @@ pub fn extract_duration(input_file: &str) -> Result<f64, Box<dyn Error>> {
 }
 
 fn run_silence_detect(
+    ffmpeg_executable: &str,
     input_file: &str,
     noise: &str,
     duration: &str,
     pattern: Regex,
 ) -> Result<Vec<f64>, Box<dyn Error>> {
-    let output = Command::new(FFMPEG_EXECUTABLE)
+    let output = Command::new(ffmpeg_executable)
         .arg("-i")
         .arg(input_file)
         .arg("-af")
