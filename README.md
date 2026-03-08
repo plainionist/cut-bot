@@ -12,6 +12,8 @@ Update `ffmpeg_executable` there to point to your local `ffmpeg.exe`.
 
 You can also set `magick_executable` if ImageMagick is not available on `PATH`.
 
+`drawio_executable` defaults to `C:\Program Files\draw.io\draw.io.exe` in the shipped config.
+
 ## Commands
 
 `cut-bot silence <input> <output.mlt>` creates a ShotCut project with silent parts marked.
@@ -38,4 +40,12 @@ Example:
 
 ```powershell
 cut-bot transparent "code*.png"
+```
+
+`cut-bot drawio <input.drawio>` exports each page of the draw.io document as a transparent PNG using `drawio_executable` from the config.
+
+Example:
+
+```powershell
+cut-bot drawio "diagram.drawio"
 ```
