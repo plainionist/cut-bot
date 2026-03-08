@@ -7,13 +7,25 @@ const CONFIG_FILE_NAME: &str = "cut-bot.conf";
 
 pub fn get_value(key: &str) -> Result<String, Box<dyn Error>> {
     let path = config_path()?;
-    let content = fs::read_to_string(&path)?;
-    let values = parse_config(&content);
+    let values = load_values()?;
 
     values
         .get(key)
         .cloned()
         .ok_or_else(|| format!("Missing '{}' in {}", key, path.display()).into())
+}
+
+pub fn get_optional_value(key: &str) -> Result<Option<String>, Box<dyn Error>> {
+    let values = load_values()?;
+
+    Ok(values.get(key).cloned())
+}
+
+fn load_values() -> Result<HashMap<String, String>, Box<dyn Error>> {
+    let path = config_path()?;
+    let content = fs::read_to_string(&path)?;
+
+    Ok(parse_config(&content))
 }
 
 pub fn config_path() -> Result<PathBuf, Box<dyn Error>> {
