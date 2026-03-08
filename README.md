@@ -27,3 +27,15 @@ Example:
 ```powershell
 cut-bot border "thumbnail-*.png"
 ```
+
+`cut-bot transparent <pattern>` applies the equivalent of:
+
+```powershell
+magick <file> -transparent "#1e1e1e" <basename>.transparent.png
+```
+
+Example:
+
+```powershell
+cut-bot transparent "code*.png"
+```
